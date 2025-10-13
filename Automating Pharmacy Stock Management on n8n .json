@@ -1,0 +1,778 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// -------------------------------------------------\n// Code node: Parse + Validate + Normalize\n// Output: each item => { Item_Name, Item_Quantity, valid, errorMessage, raw_text, sourceUser }\n// -------------------------------------------------\nconst items = $input.all();\n\nfor (const item of items) {\n  const raw = item.json.message?.text || \"\";\n  item.json.raw_text = raw;\n  item.json.sourceUser = item.json.message?.from?.username || item.json.message?.from?.first_name || \"unknown\";\n\n  const firstLine = raw.split(/\\r?\\n/)[0].trim();\n\n  if (!firstLine) {\n    item.json.valid = false;\n    item.json.errorMessage = \"النص فارغ. الرجاء إرسال اسم الصنف ثم الكمية، مثل: Panadol 5 أو Panadol -2 للخصم\";\n    continue;\n  }\n\n  const parts = firstLine.split(/\\s+/);\n  if (parts.length < 2) {\n    item.json.valid = false;\n    item.json.errorMessage = \"الصيغة غير صحيحة. الصيغة الصحيحة: اسم_الصنف ثم الكمية (مثال: Panadol 5)\";\n    continue;\n  }\n\n  const qtyRaw = parts.pop();\n  const qtyNormalized = qtyRaw.replace(/،/g, \".\").replace(/,/g, \".\");\n  const quantity = parseFloat(qtyNormalized);\n\n  if (isNaN(quantity)) {\n    item.json.valid = false;\n    item.json.errorMessage = `الكمية غير رقمية: \\\"${qtyRaw}\\\"`;\n    continue;\n  }\n\n  if (!isFinite(quantity)) {\n    item.json.valid = false;\n    item.json.errorMessage = \"الكمية غير صالحة (ليس رقماً محدوداً).\";\n    continue;\n  }\n\n  const name = parts.join(\" \").trim();\n  if (!name) {\n    item.json.valid = false;\n    item.json.errorMessage = \"اسم الصنف فارغ بعد المعالجة.\";\n    continue;\n  }\n\n  // ✅ دعم الكميات السالبة (للطرح)\n  item.json.Item_Name = name;\n  item.json.Item_Quantity = Number(quantity);\n  item.json.valid = true;\n  delete item.json.errorMessage;\n}\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        -256
+      ],
+      "id": "a918205b-ffff-45fc-b75a-d3d94d9bb85c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0",
+          "mode": "list",
+          "cachedResultName": "pharmacy-stock",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Item_Name": "={{ $json.Item_Name }}",
+            "ID": "={{ $json.ID }}",
+            "amount": "=={{ $json[\"amount\"] + $('Code in JavaScript').item.json[\"Item_Quantity\"] }}\n"
+          },
+          "matchingColumns": [
+            "Item_Name"
+          ],
+          "schema": [
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Item_Name",
+              "displayName": "Item_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "amount",
+              "displayName": "amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1216,
+        -448
+      ],
+      "id": "d7508fb7-541c-4824-897e-df5222ce9685",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WAnu5vPpJEIwYw81",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        -256
+      ],
+      "id": "c61b13b6-6767-4b72-80fc-0cf0fd91b50b",
+      "name": "Telegram Trigger",
+      "webhookId": "02e39dc4-9967-48c5-af72-42c2fc1b1da8",
+      "credentials": {
+        "telegramApi": {
+          "id": "yt82Pl4WeNdxQAPe",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=={{ \n  $('Add metadata').item.json.metadata.operation === 'update'\n    ? (\n        $('Code in JavaScript').item.json.Item_Quantity < 0\n          ? `📉 تم خصم ${Math.abs($('Code in JavaScript').item.json.Item_Quantity)} من:\\n📦 ${$('Add metadata').item.json.Item_Name}\\nالكمية الجديدة: ${$('Add metadata').item.json.amount}`\n          : `🔄 تم إضافة ${$('Code in JavaScript').item.json.Item_Quantity} إلى:\\n📦 ${$('Add metadata').item.json.Item_Name}\\nالكمية الجديدة: ${$('Add metadata').item.json.amount}`\n      )\n    : `🆕 تم إضافة صنف جديد:\\n📦 ${$('Add metadata').item.json.Item_Name}\\nالكمية: ${$('Add metadata').item.json.amount}`\n}}\n",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1888,
+        -448
+      ],
+      "id": "48366f45-b195-4eb9-8300-19bc21d1dace",
+      "name": "Send a text message",
+      "webhookId": "3411d63b-7e3a-4840-99f7-c64b85b68fe8",
+      "credentials": {
+        "telegramApi": {
+          "id": "yt82Pl4WeNdxQAPe",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "eb19d520-0a79-42da-95fd-9a06ab548784",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        -256
+      ],
+      "id": "c19d4951-58a4-4e4d-af4c-769143ef32a7",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "=\n{{ 'التنسيق غير صحيح:\\n' + \n($('Telegram Trigger').item.json.message.from.first_name || $('Code in JavaScript').item.json.sourceUser || '') + \n'\\nالرجاء إرسال: اسم الصنف ثم الكمية، مثال:\\nPanadol 5' }}\n",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        544,
+        -160
+      ],
+      "id": "969b9e7d-76f5-451b-b2e1-2e3024a53ad1",
+      "name": "Send a text message1",
+      "webhookId": "62c8a44a-630c-4b0e-a7b8-a171528a0f85",
+      "credentials": {
+        "telegramApi": {
+          "id": "yt82Pl4WeNdxQAPe",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ecd6a5f0-4f65-40a9-95cf-1b3f82b0bd71",
+              "leftValue": "={{ $json[\"Item_Name\"] && $json[\"Item_Name\"] !== \"\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        768,
+        -352
+      ],
+      "id": "9797d7a3-507b-4184-9107-c60163bcf2c8",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0",
+          "mode": "list",
+          "cachedResultName": "pharmacy-stock",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Item_Name": "={{ $node[\"Code in JavaScript\"].json[\"Item_Name\"] }}",
+            "amount": "={{ $node[\"Code in JavaScript\"].json[\"Item_Quantity\"] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "ID",
+              "displayName": "ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Item_Name",
+              "displayName": "Item_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "amount",
+              "displayName": "amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        992,
+        -256
+      ],
+      "id": "1bcead4e-242c-42ea-8ce1-a7fb034c74cc",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WAnu5vPpJEIwYw81",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0",
+          "mode": "list",
+          "cachedResultName": "pharmacy-stock",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Item_Name",
+              "lookupValue": "={{ $('Code in JavaScript').item.json.Item_Name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        544,
+        -352
+      ],
+      "id": "4dbeb41e-bdd6-4f89-bb21-9cbc0213dd14",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WAnu5vPpJEIwYw81",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ \n  $('Add metadata1').item.json.operation === 'update'\n    ? `🔄 تم تحديث الكمية:\\n📦 ${$('Add metadata1').item.json.Item_Name}\\nالكمية الجديدة: ${$('Add metadata1').item.json.amount}`\n    : `🆕 تم إضافة صنف جديد:\\n📦 ${$('Add metadata1').item.json.Item_Name}\\nالكمية: ${$('Add metadata1').item.json.amount}`\n}}\n",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1664,
+        -256
+      ],
+      "id": "ce8fd8f9-c018-4760-a69d-90c763c51bac",
+      "name": "Send a text message2",
+      "webhookId": "62c8a44a-630c-4b0e-a7b8-a171528a0f85",
+      "credentials": {
+        "telegramApi": {
+          "id": "yt82Pl4WeNdxQAPe",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!$json.amount || isNaN($json.amount)) {\n  $json.amount = 0;\n}\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -448
+      ],
+      "id": "10b5d679-0907-49e6-965d-02c788114b8f",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// -------------------------------------------------\n// Node: Set Metadata\n// الهدف: توثيق من نفذ العملية، نوعها، والتاريخ\n// -------------------------------------------------\n\nconst items = $input.all();\n\nfor (const item of items) {\n  // جلب اسم المستخدم من عقدة التلغرام أو من الـ Code الأولى\n  const sourceUser = $('Code in JavaScript').item.json.sourceUser || 'unknown';\n\n  // تحديد نوع العملية (إضافة أو تحديث)\n  // نستخدم اسم العقدة السابقة لمعرفة المسار القادم منها\n  const previousNode = $prevNode.name;\n  const operation = previousNode.includes('Update') ? 'update' : 'add';\n\n  // إضافة معلومات التتبع\n  item.json.metadata = {\n    user: sourceUser,\n    operation,\n    timestamp: new Date().toISOString(),\n  };\n}\n\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -448
+      ],
+      "id": "01f3d88d-7b0c-457f-92d4-261adb899242",
+      "name": "Add metadata"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  item.json.operation = $node[\"If1\"].context.runIndex === 0 ? \"update\" : \"add\";\n  item.json.timestamp = new Date().toISOString();\n  item.json.user = $('Code in JavaScript').item.json.sourceUser;\n}\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -256
+      ],
+      "id": "dae60481-b268-4ce5-a8b9-b09a8f5abcb3",
+      "name": "Add metadata1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0",
+          "mode": "list",
+          "cachedResultName": "pharmacy-stock",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 962813904,
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit#gid=962813904"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.metadata.timestamp }}",
+            "User": "={{ $json.metadata.user }}",
+            "Operation": "={{ $json.metadata.operation }}",
+            "Item": "={{ $json.Item_Name }}",
+            "Quantity": "={{ $json.amount }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "User",
+              "displayName": "User",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Operation",
+              "displayName": "Operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Item",
+              "displayName": "Item",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1664,
+        -448
+      ],
+      "id": "cbfcbcef-8e75-4ac5-8a28-44bc68450920",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WAnu5vPpJEIwYw81",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0",
+          "mode": "list",
+          "cachedResultName": "pharmacy-stock",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 962813904,
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-9Ale-6LmDcupfQ8PmnCCe7da9hkeGfkaU3oYwQxVh0/edit#gid=962813904"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.timestamp }}",
+            "User": "={{ $('Telegram Trigger').item.json.message.chat.first_name }}",
+            "Operation": "={{ $json.operation }}",
+            "Item": "={{ $json.Item_Name }}",
+            "Quantity": "={{ $json.amount }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "User",
+              "displayName": "User",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Operation",
+              "displayName": "Operation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Item",
+              "displayName": "Item",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1440,
+        -256
+      ],
+      "id": "47aa01fe-a45e-4794-b1f6-0de872d525a3",
+      "name": "Append row in sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WAnu5vPpJEIwYw81",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Add metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Add metadata1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add metadata": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add metadata1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet2": {
+      "main": [
+        [
+          {
+            "node": "Send a text message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "01538055-a126-42a1-9e38-1568dabf7811",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a3116882c30bfab62986017add734833e295c3385c89a8b43834db98c8145bf8"
+  },
+  "id": "NGjrrhdVNSCzOuEW",
+  "tags": []
+}
